@@ -780,26 +780,4 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
                 break;
         }
     }
-
-    public void load2() {
-        SharedPreferences sharedPreferences = getSharedPreferences("sharedPrefs", MODE_PRIVATE);
-        Gson gson = new Gson();
-        String json = sharedPreferences.getString("cdata", null);
-        Type type = new TypeToken<ArrayList<Product>>() {
-        }.getType();
-        letsc = gson.fromJson(json, type);
-    }
-
-    public void save()
-    {
-        SharedPreferences sharedPreferences = getSharedPreferences("sharedPrefs", MODE_PRIVATE);
-        editor = sharedPreferences.edit();
-
-        Gson gson = new Gson();
-        String json = gson.toJson(letsc);
-        editor.putString("cdata", json);
-        editor.apply();
-
-    }
-
 }
