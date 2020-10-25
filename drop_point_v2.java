@@ -1,23 +1,33 @@
 import android.Manifest;
+import android.animation.Animator;
 import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Point;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.util.Log;
+import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.view.animation.Interpolator;
 import android.view.animation.LinearInterpolator;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -40,6 +50,7 @@ import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.LocationSettingsResult;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.SettingsClient;
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -48,9 +59,20 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.common.reflect.TypeToken;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.gson.Gson;
+
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
+import static com.shopcode.customer.home2.editor;
 
 public class drop_point_v2 extends FragmentActivity implements LocationListener,
         ResultCallback<LocationSettingsResult>,
@@ -58,7 +80,7 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
                 .ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     private GoogleMap mMap;
-    private final int MY_LOCATION_REQUEST_CODE = 100;
+    //private final int MY_LOCATION_REQUEST_CODE = 100;
     private Handler handler;
     private Marker m;
 //    private GoogleApiClient googleApiClient;
@@ -87,6 +109,11 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
     public static boolean GpsStatus;
     private GoogleApiClient googleApiClient;
     protected static final int REQUEST_CHECK_SETTINGS = 0x1;
+    public static ArrayList<Product> letsc;
+    private FirebaseFirestore db;
+    private ImageView pin;
+    private Button choose;
+    private ProgressBar loading;
 
     protected void createLocationRequest() {
         mLocationRequest = new LocationRequest();
@@ -100,15 +127,35 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_drop_point);
 
+        Window w = getWindow();
+        w.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+
+        loading = (ProgressBar) findViewById(R.id.choose_loading);
+        choose = (Button) findViewById(R.id.choose);
+        pin = (ImageView) findViewById(R.id.pin);
+        pin.setVisibility(View.GONE);
+
+        pin.setAlpha(0f);
+        pin.setTranslationY(-100f);
+        pin.setVisibility(View.VISIBLE);
+        pin.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(600)
+                .setListener(null);
+
         context = drop_point_v2.this;
         activity = this;
 
-        createLocationRequest();
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(LocationServices.API)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
+        try {
+            createLocationRequest();
+            mGoogleApiClient = new GoogleApiClient.Builder(this)
+                    .addApi(LocationServices.API)
+                    .addConnectionCallbacks(this)
+                    .addOnConnectionFailedListener(this)
+                    .build();
+        }catch (Exception e){}
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -144,14 +191,34 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-
-        m = mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in " +
-                "Sydney"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
-
-
+        LatLng sydney;
+        float zoom = 10f;
+        if (letsc.get(0).getPrice() != null) {
+            if (!letsc.get(0).getPrice().equalsIgnoreCase("")) {
+                String loc_str = letsc.get(0).getPrice();
+                double lat = Double.parseDouble(loc_str.split(",")[0]);
+                double lon = Double.parseDouble(loc_str.split(",")[1]);
+                sydney = new LatLng(lat, lon);
+                zoom = 17f;
+                LatLng sydney1 = new LatLng(19.217181, 73.087332);
+                CameraUpdate update1 = CameraUpdateFactory.newLatLngZoom(sydney1, 10f);
+                mMap.moveCamera(update1);
+                CameraUpdate update = CameraUpdateFactory.newLatLngZoom(sydney, zoom);
+                mMap.animateCamera(update);
+            } else {
+                sydney = new LatLng(19.217181, 73.087332);
+                CameraUpdate update1 = CameraUpdateFactory.newLatLngZoom(sydney, 10f);
+                mMap.moveCamera(update1);
+                CameraUpdate update = CameraUpdateFactory.newLatLngZoom(googleMap.getCameraPosition().target, 14f);
+                mMap.animateCamera(update);
+            }
+        } else {
+            sydney = new LatLng(19.217181, 73.087332);
+            CameraUpdate update1 = CameraUpdateFactory.newLatLngZoom(sydney, 10f);
+            mMap.moveCamera(update1);
+            CameraUpdate update = CameraUpdateFactory.newLatLngZoom(googleMap.getCameraPosition().target, 14f);
+            mMap.animateCamera(update);
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
             mMap.setMyLocationEnabled(true);
@@ -160,8 +227,7 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
         }
 
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-        {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkLocationPermission()) {
                 CheckGpsStatus();
                 mMap.setMyLocationEnabled(true);
@@ -260,19 +326,151 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
     }
 
 
-   /* @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[]
-            grantResults) {
-        if (requestCode == MY_LOCATION_REQUEST_CODE) {
-            if (permissions.length == 1 &&
-                    permissions[0] == Manifest.permission.ACCESS_FINE_LOCATION &&
-                    grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                mMap.setMyLocationEnabled(true);
-            } else {
-                // Permission was denied. Display an error message.
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_LOCATION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    // permission was granted, yay! Do the
+                    // location-related task you need to do.
+                    if (ContextCompat.checkSelfPermission(this,
+                            Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED)
+                    {
+
+                        try {
+                            createLocationRequest();
+                            Log.d(TAG, "CREATE LOC REQ");
+                            mGoogleApiClient = new GoogleApiClient.Builder(this)
+                                    .addApi(LocationServices.API)
+                                    .addConnectionCallbacks(this)
+                                    .addOnConnectionFailedListener(this)
+                                    .build();
+                            Log.d(TAG, "API CLIENT BUILT");
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                            {
+                                if (checkLocationPermission()) {
+                                    Log.d(TAG, "PERMISSION GRANT DETECTED");
+                                    CheckGpsStatus();
+                                    mMap.setMyLocationEnabled(true);
+                                }
+                            } else {
+                                mMap.setMyLocationEnabled(true);
+                                CheckGpsStatus();
+                            }
+                            Log.d(TAG, "TRY CATCH EXEC. SUCCESS");
+                        }catch (Exception e){                    Log.d(TAG, "TRY CATCH EXEC. FAILURE WITH\n"+e.toString());
+                        }
+
+                        //Request location updates:
+                        //locationManager.requestLocationUpdates(provider, 400, 1, this);
+                    }
+
+                } else {
+
+                    if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                            Manifest.permission.ACCESS_FINE_LOCATION))
+                    {
+                        new AlertDialog.Builder(this)
+                                .setTitle("Location Permission not granted!")
+                                .setMessage("You may still...\nSet the location on map manually\nOR\nprovide location permissions in settings")
+                                .setPositiveButton("Provide", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialogInterface, int i) {
+                                        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                        Uri uri = Uri.fromParts("package", getPackageName(), null);
+                                        intent.setData(uri);
+                                        startActivityForResult(intent, MY_PERMISSIONS_REQUEST_LOCATION);
+                                    }
+                                }).setNegativeButton("Set manually", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                //Prompt the user once explanation has been shown
+                                dismissDialog(i);
+                            }
+                        })
+                                .create()
+                                .show();
+                    }else{
+                        // permission denied, boo! Disable the
+                        // functionality that depends on this permission.
+                        new AlertDialog.Builder(this)
+                                .setTitle("Location Permission")
+                                .setMessage("Your location is required to set your delivery location.")
+                                .setPositiveButton("Grant", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialogInterface, int i) {
+                                        //Prompt the user once explanation has been shown
+                                        ActivityCompat.requestPermissions(drop_point_v2.this,
+                                                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                                                MY_PERMISSIONS_REQUEST_LOCATION);
+                                    }
+                                })
+                                .create()
+                                .show();
+                    }
+
+
+
+                }
+                return;
             }
+
         }
-    }*/
+    }
+
+
+//    @Override
+//    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[]
+//            grantResults) {
+//        if (requestCode == MY_PERMISSIONS_REQUEST_LOCATION)
+//        {
+//            if (permissions.length == 1 &&
+//                    permissions[0] == Manifest.permission.ACCESS_FINE_LOCATION &&
+//                    grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+//                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+//                    // TODO: Consider calling
+//                    //    ActivityCompat#requestPermissions
+//                    // here to request the missing permissions, and then overriding
+//                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+//                    //                                          int[] grantResults)
+//                    // to handle the case where the user grants the permission. See the documentation
+//                    // for ActivityCompat#requestPermissions for more details.
+//                    return;
+//                }
+//                try {
+//                    createLocationRequest();
+//                    Log.d(TAG, "CREATE LOC REQ");
+//                    mGoogleApiClient = new GoogleApiClient.Builder(this)
+//                            .addApi(LocationServices.API)
+//                            .addConnectionCallbacks(this)
+//                            .addOnConnectionFailedListener(this)
+//                            .build();
+//                    Log.d(TAG, "API CLIENT BUILT");
+//                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+//                    {
+//                        if (checkLocationPermission()) {
+//                            Log.d(TAG, "PERMISSION GRANT DETECTED");
+//                            CheckGpsStatus();
+//                            mMap.setMyLocationEnabled(true);
+//                        }
+//                    } else {
+//                        mMap.setMyLocationEnabled(true);
+//                        CheckGpsStatus();
+//                    }
+//                    Log.d(TAG, "TRY CATCH EXEC. SUCCESS");
+//                }catch (Exception e){                    Log.d(TAG, "TRY CATCH EXEC. FAILURE WITH\n"+e.toString());
+//                }
+//
+//            } else {
+//                // Permission was denied. Display an error message.
+//            }
+//        }
+//    }
 
     @Override
     public void onConnected(@Nullable Bundle bundle) {
@@ -285,14 +483,14 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
     protected void onStart() {
         super.onStart();
         Log.d(TAG, "onStart fired ..............");
-        mGoogleApiClient.connect();
+        try{mGoogleApiClient.connect();}catch (Exception e){}
     }
 
     @Override
     protected void onStop() {
         super.onStop();
 
-        mGoogleApiClient.disconnect();
+        try{mGoogleApiClient.disconnect();}catch (Exception e){}
         Log.d(TAG, "isConnected ...............: " + mGoogleApiClient.isConnected());
     }
 
@@ -339,7 +537,7 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
         }
 
 
-        rotateMarker(m, (float) rota, (float) startrota);
+        //rotateMarker(m, (float) rota, (float) startrota);
 
 
         previousLocation = location;
@@ -347,7 +545,10 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
         Log.d(TAG, "lat :" + location.getLatitude() + "long :" + location.getLongitude());
         Log.d(TAG, "bearing :" + location.getBearing());
 
-        animateMarker(new LatLng(location.getLatitude(), location.getLongitude()), false);
+        CameraUpdate update1 = CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()), 16f);
+        mMap.animateCamera(update1);
+
+//        animateMarker(new LatLng(location.getLatitude(), location.getLongitude()), false);
 //        new ServerConnAsync(handler, drop_point_v2.this,location).execute();
 
 
@@ -356,7 +557,9 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
     @Override
     protected void onPause() {
         super.onPause();
-        stopLocationUpdates();
+        try {
+            stopLocationUpdates();
+        }catch (Exception e){}
     }
 
     protected void stopLocationUpdates() {
@@ -368,10 +571,12 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
     @Override
     public void onResume() {
         super.onResume();
-        if (mGoogleApiClient.isConnected()) {
-            startLocationUpdates();
-            Log.d(TAG, "Location update resumed .....................");
-        }
+        try {
+            if (mGoogleApiClient.isConnected()) {
+                startLocationUpdates();
+                Log.d(TAG, "Location update resumed .....................");
+            }
+        }catch (Exception e){}
     }
 
     @Override
@@ -401,10 +606,12 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
         }
     }
 
-    public boolean checkLocationPermission() {
+    public boolean checkLocationPermission()
+    {
         if (ContextCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
+                != PackageManager.PERMISSION_GRANTED)
+        {
 
             // Should we show an explanation?
             if (ActivityCompat.shouldShowRequestPermissionRationale(this,
@@ -540,7 +747,17 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
                 switch (resultCode) {
                     case Activity.RESULT_OK:
                         Log.i(TAG, "User agreed to make required location settings changes.");
-                        startLocationUpdates();
+                        try {
+                            mGoogleApiClient = new GoogleApiClient.Builder(this)
+                                    .addApi(LocationServices.API)
+                                    .addConnectionCallbacks(this)
+                                    .addOnConnectionFailedListener(this)
+                                    .build();
+                            mGoogleApiClient.connect();
+                            startLocationUpdates();
+                        }catch (Exception e){
+                            Log.d(TAG, e.toString());
+                        }
                         break;
                     case Activity.RESULT_CANCELED:
                         Log.i(TAG, "User chose not to make required location settings changes.");
@@ -564,6 +781,25 @@ public class drop_point_v2 extends FragmentActivity implements LocationListener,
         }
     }
 
+    public void load2() {
+        SharedPreferences sharedPreferences = getSharedPreferences("sharedPrefs", MODE_PRIVATE);
+        Gson gson = new Gson();
+        String json = sharedPreferences.getString("cdata", null);
+        Type type = new TypeToken<ArrayList<Product>>() {
+        }.getType();
+        letsc = gson.fromJson(json, type);
+    }
 
+    public void save()
+    {
+        SharedPreferences sharedPreferences = getSharedPreferences("sharedPrefs", MODE_PRIVATE);
+        editor = sharedPreferences.edit();
+
+        Gson gson = new Gson();
+        String json = gson.toJson(letsc);
+        editor.putString("cdata", json);
+        editor.apply();
+
+    }
 
 }
