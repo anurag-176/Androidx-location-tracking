@@ -1,5 +1,5 @@
 # Androidx-location-tracking
-This code requests permission, handles permission denial, turns on location with prompt with its respective denials and finally tracks the location
+This code requests permission, handles permission denial, turns on location with prompt with its respective denial handling and finally tracks the location
 
 This code doesn't entirely belong to me as the tracking part is taken from a StackOverflow answer on this thread
 https://stackoverflow.com/questions/43318968/how-to-make-a-simple-tracking-android-app-using-android-studio
