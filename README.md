@@ -6,4 +6,4 @@ https://stackoverflow.com/questions/43318968/how-to-make-a-simple-tracking-andro
 Answered by- https://stackoverflow.com/users/4476671/avinash-verma (Avinash Verma)
 rest is coded by me
 
-Well, you may delete some unwanted lines of views init. in onCreate, I was lazy to remove those, anyway that wont affect the funcctioning.
+Well, you may delete some unwanted lines of views init. in onCreate, I was lazy to remove those, anyway that wont affect the functioning.
