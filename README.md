@@ -9,8 +9,8 @@ rest is coded by me
 Well, you may delete some unwanted lines of views init. in onCreate, I was lazy to remove those, anyway that wont affect the functioning.
 
 USAGE:
-1. Create a Map Activity
-2. Plug in your API keys
+1. Create a Map Activity.
+2. Plug in your API keys.
 3. Add location permissions to your Manifest.
 3. Test if basic Map is loading.
-4. Then simply copy paste the respective java and xml files
+4. Then simply copy paste the java and xml files in their respective places.
